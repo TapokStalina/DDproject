@@ -26,7 +26,21 @@ namespace Api.Controllers
 
 
         [HttpGet]
-       public async Task<List<UserModel>> GetUsers() => await _userServices.GetUsers();
+        [Authorize]
+        public async Task<List<UserModel>> GetUsers() => await _userServices.GetUsers();
+
+        [HttpGet]
+        [Authorize]
+        public async Task<UserModel> GetCurrentUser()
+        {
+            var userIdString = User.Claims.FirstOrDefault(x => x.Type == "id")?.Value;
+            if (Guid.TryParse(userIdString, out var userId))
+            {
+                return await _userServices.GetUser(userId);
+            }
+            else
+                throw new Exception("You are not authorized");
+        }
         
 
     }
