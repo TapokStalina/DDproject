@@ -22,8 +22,13 @@ namespace Api.Controllers
         }
 
         [HttpPost]
-        public async Task CreateUser(CreateUserModel model) => await _userServices.CreateUser(model);
+        public async Task CreateUser(CreateUserModel model)
+        {
+            if (await _userServices.CheckUserExist(model.Email))
+                throw new Exception("user is exist");
+            await _userServices.CreateUser(model);
 
+        }
 
         [HttpGet]
         [Authorize]
