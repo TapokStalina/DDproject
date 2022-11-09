@@ -1,4 +1,5 @@
-﻿using Api.Models;
+﻿using Api.Models.Attach;
+using Api.Models.UserModel;
 using Api.Services;
 using AutoMapper;
 using AutoMapper.QueryableExtensions;
@@ -25,9 +26,57 @@ namespace Api.Controllers
         public async Task CreateUser(CreateUserModel model)
         {
             if (await _userServices.CheckUserExist(model.Email))
-                throw new Exception("user is exist");
+                throw new Exception("User is exist");
             await _userServices.CreateUser(model);
 
+        }
+
+        [HttpPost]
+        [Authorize]
+        public async Task AddAvatarToUser(MetadataModel model)
+        {
+            var userIdString = User.Claims.FirstOrDefault(x => x.Type == "id")?.Value;
+            if (Guid.TryParse(userIdString, out var userId))
+            {
+                var tempFi = new FileInfo(Path.Combine(Path.GetTempPath(), model.TempId.ToString()));
+                if (!tempFi.Exists)
+                    throw new Exception("File not found");
+                else
+                {
+                    var path = Path.Combine(Directory.GetCurrentDirectory(), "attaches", model.TempId.ToString());
+                    var destFi = new FileInfo(path);
+                    if (destFi.Directory != null && !destFi.Directory.Exists)
+                        destFi.Directory.Create();
+
+                    System.IO.File.Copy(tempFi.FullName, path, true);
+
+                    await _userServices.AddAvatarToUser(userId, model, path);
+                }
+            }
+            else
+                throw new Exception("You are not authorized");
+        }
+
+        [HttpGet]
+        public async Task<FileResult> GetUserAvatar(Guid userId)
+        {
+            var attach = await _userServices.GetUserAvatar(userId);
+
+            return File(System.IO.File.ReadAllBytes(attach.FilePath), attach.MimeType);
+        }
+
+        [HttpGet]
+        public async Task<FileResult> DownloadAvatar(Guid userId)
+        {
+            var attach = await _userServices.GetUserAvatar(userId);
+
+            HttpContext.Response.ContentType = attach.MimeType;
+            FileContentResult result = new FileContentResult(System.IO.File.ReadAllBytes(attach.FilePath), attach.MimeType)
+            {
+                FileDownloadName = attach.Name
+            };
+
+            return result;
         }
 
         [HttpGet]
@@ -46,7 +95,5 @@ namespace Api.Controllers
             else
                 throw new Exception("You are not authorized");
         }
-        
-
     }
 }
