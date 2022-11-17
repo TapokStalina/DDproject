@@ -1,5 +1,6 @@
 ﻿using DAL.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,6 +25,13 @@ namespace DAL
 
             modelBuilder.Entity<Post>().ToTable(nameof(Posts));
 
+            modelBuilder.Entity<PostContent>().ToTable(nameof(PostContent));
+
+            modelBuilder.Entity<Comment>().ToTable(nameof(Comments));
+            modelBuilder.Entity<CommentContent>().ToTable(nameof(CommentContent));
+
+
+
 
         }
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -34,8 +42,10 @@ namespace DAL
         public DbSet<Attach> Attaches => Set<Attach>();
         public DbSet<Avatar> Avatars => Set<Avatar>();
         public DbSet<Post> Posts => Set<Post>();
-        public DbSet<Comment> Comments => Set<Comment>();
+        public DbSet<PostContent> PostContents => Set<PostContent>();
+        public DbSet<CommentContent> CommentContents => Set<CommentContent>();
 
+        public DbSet<Comment> Comments => Set<Comment>();
 
     }
 }

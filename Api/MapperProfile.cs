@@ -18,12 +18,24 @@ namespace Api
             CreateMap<DAL.Entities.User, UserModel>();
 
             CreateMap<DAL.Entities.Avatar, AttachModel>();
+            CreateMap< DAL.Entities.PostContent, AttachModel >();
 
-            CreateMap<DAL.Entities.Post, GetPostModel>()
-                .ForMember(c => c.UserId, m => m.MapFrom(s => s.Author.Id));
 
-            CreateMap<DAL.Entities.Comment, GetCommentsModel>()
-                .ForMember(c => c.UserId, m => m.MapFrom(s => s.Author.Id));
+            CreateMap<MetadataModel, DAL.Entities.PostContent>();
+
+            CreateMap<MetaWithPath, DAL.Entities.PostContent>();
+
+            CreateMap<CreatePostModel, DAL.Entities.Post>()
+                .ForMember(d => d.PostContents, m => m.MapFrom(s => s.Contents))
+                .ForMember(d => d.Created, m => m.MapFrom(s => DateTime.UtcNow));
+
+            CreateMap<CreateCommentModel, DAL.Entities.Comment>()
+                .ForMember(d => d.Created, m => m.MapFrom(s => DateTime.UtcNow));
+            CreateMap<CreateCommentModel, DAL.Entities.Post>()
+                .ForMember(d => d.Id, m => m.MapFrom(s => s.PostId))
+                .ForMember(d => d.CommentContents, m => m.MapFrom(s => s.Contents))
+;
+
 
 
 

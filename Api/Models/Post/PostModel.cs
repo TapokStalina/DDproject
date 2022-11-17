@@ -1,13 +1,14 @@
 ﻿using Api.Models.Attach;
+using Api.Models.UserModel;
 using DAL.Entities;
 
 namespace Api.Models.Post
 {
     public class PostModel
     {
-        public List<MetadataModel>? PostAttaches { get; set; }
+        public Guid Id { get; set; }
         public string? Description { get; set; }
-        public DateTimeOffset Created { get; set; }
-
+        public UserAvatarModel Author { get; set; } = null!;
+        public List<AttachWithLinkModel>? Contents { get; set; } = new List<AttachWithLinkModel>();
     }
 }

@@ -1,7 +1,10 @@
-﻿using Api.Models.Attach;
+﻿using Api.Common.Const;
+using Api.Models.Attach;
 using Api.Models.Post;
 using Api.Services;
 using AutoMapper;
+using Common.Extentions;
+using DAL.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -13,80 +16,102 @@ namespace Api.Controllers
     [ApiController]
     public class PostController : ControllerBase
     {
-        private readonly UserServices _userService;
-
-        public PostController(UserServices userService)
+        private readonly PostServices _postService;
+        public PostController(PostServices postService)
         {
-            _userService = userService;
-        }
-
-        [HttpPost]
-        [Authorize]
-        public async Task CreatePost(List<MetadataModel> attaches, string description)
-        {
-            var userIdString = User.Claims.FirstOrDefault(x => x.Type == "id")?.Value;
-            if (Guid.TryParse(userIdString, out var userId))
-            {
-                if (attaches != null || description != null)
+            _postService = postService;
+            _postService.SetLinkGenerator(
+                linkAvatarGenerator: x =>
+                Url.Action(nameof(UserController.GetUserAvatar), "User", new
                 {
-                    PostModel model = new PostModel { Description = description, PostAttaches = attaches, Created = DateTime.UtcNow };
-                    if (attaches != null)
-                    {
-                        List<string> paths = new List<string>();
-                        foreach (var attach in attaches)
-                        {
-                            var tempFi = new FileInfo(Path.Combine(Path.GetTempPath(), attach.TempId.ToString()));
-                            if (!tempFi.Exists)
-                                throw new Exception("File not found");
-                            else
-                            {
-                                var path = Path.Combine(Directory.GetCurrentDirectory(), "attaches", attach.TempId.ToString());
-                                var destFi = new FileInfo(path);
-                                if (destFi.Directory != null && !destFi.Directory.Exists)
-                                    destFi.Directory.Create();
+                    userId = x.Id,
+                    download = false
+                }),
+                linkContentGenerator: x => Url.Action(nameof(GetPostContent), new
+                {
+                    postContentId = x.Id,
+                    download = false
+                }))
+                 ;
+        }
 
-                                System.IO.File.Copy(tempFi.FullName, path, true);
-                                paths.Add(path);
-                            }
-                        }
-                        await _userService.AddPost(userId, model, paths.ToArray());
-                    }
-                    else
-                        await _userService.AddPost(userId, model);
-                }
-                else
-                    throw new Exception("Empty post");
-            }
+        [HttpGet]
+        [AllowAnonymous]
+        public async Task<FileStreamResult> GetPostContent(Guid postContentId, bool download = false)
+        {
+            var attach = await _postService.GetPostContent(postContentId);
+            var fs = new FileStream(attach.FilePath, FileMode.Open);
+            if (download)
+                return File(fs, attach.MimeType, attach.Name);
             else
-                throw new Exception("You are not authorized");
+                return File(fs, attach.MimeType);
+
+        }
+
+        [HttpGet]
+        public async Task<List<PostModel>> GetPosts(int skip = 0, int take = 10)
+            => await _postService.GetPosts(skip, take);
+
+        [HttpPost]
+        public async Task CreatePost(CreatePostRequest request)
+        {
+            var userId = User.GetClaimValue<Guid>(ClaimNames.Id);
+            if (userId == default)
+                throw new Exception("Not authorize");
+
+            var model = new CreatePostModel
+            {
+                AuthorId = userId,
+                Description = request.Description,
+                Contents = request.Contents.Select(x =>
+                new MetaWithPath(x, q => Path.Combine(
+                    Directory.GetCurrentDirectory(),
+                    "attaches",
+                    q.TempId.ToString()), userId)).ToList()
+            };
+
+            model.Contents.ForEach(x =>
+            {
+                var tempFi = new FileInfo(Path.Combine(Path.GetTempPath(), x.TempId.ToString()));
+                if (tempFi.Exists)
+                {
+                    var destFi = new FileInfo(x.FilePath);
+                    if (destFi.Directory != null && !destFi.Directory.Exists)
+                        destFi.Directory.Create();
+
+                    System.IO.File.Copy(tempFi.FullName, x.FilePath, true);
+                    tempFi.Delete();
+                }
+
+            });
+
+            await _postService.CreatePost(model);
+
         }
 
         [HttpPost]
-        [Authorize]
-        public async Task CreateComment(Guid userId, CommentModel model)
+        public async Task CreateComment(CreateCommentRequest request)
         {
-            await _userService.AddCommentToPost(userId, model);
-        }
+            
+            var userId = User.GetClaimValue<Guid>(ClaimNames.Id);
+            if (userId == default)
+                throw new Exception("Not authorize");
 
-        [HttpGet]
-        public async Task<List<GetCommentsModel>> GetComments(Guid postId)
-        {
-            return await _userService.GetCommentsFromPost(postId);
-        }
+            var model = new CreateCommentModel
+            {
+                CommentText = request.CommentText,
+                CommentId = new Guid(),
+                PostId = request.PostId,
+                AuthorId = userId,
+                Created = DateTime.Now,
 
-        [HttpGet]
-        public async Task<List<GetPostModel>> GetPosts(Guid userId)
-        {
-            var posts = await _userService.GetPosts(userId);
-            return posts;
+            };
+            await _postService.CreateComment(model);
         }
+        [HttpGet]
+        public async Task<List<CommentModel>> GetComments(Guid postId)
+             => await _postService.GetComments(postId);
 
-        [HttpGet]
-        public async Task<GetPostModel> GetPost(Guid userId, Guid postId)
-        {
-            var post = await _userService.GetPostById(userId, postId);
-            return post;
-        }
     }
 }
 

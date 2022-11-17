@@ -1,4 +1,6 @@
-﻿using Api.Services;
+﻿using Api.Common.Const;
+using Api.Services;
+using Common.Extentions;
 using DAL;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
@@ -18,8 +20,8 @@ namespace Api
         public async Task InvokeAsync(HttpContext context, UserServices userService)
         {
             var isOk = true;
-            var sessionIdString = context.User.Claims.FirstOrDefault(x => x.Type == "sessionId")?.Value;
-            if (Guid.TryParse(sessionIdString, out var sessionId))
+            var sessionId = context.User.GetClaimValue<Guid>(ClaimNames.SessionId);
+            if (sessionId != default)
             {
                 var session = await userService.GetSessionById(sessionId);
                 if (!session.IsActive)

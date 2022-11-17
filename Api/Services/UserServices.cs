@@ -27,6 +27,13 @@ namespace Api.Services
             _context = context;
             _config = config.Value;
         }
+
+        private Func<UserModel, string?>? _linkGenerator;
+        public void SetLinkGenerator(Func<UserModel, string?> linkGenerator)
+        {
+            _linkGenerator = linkGenerator;
+        }
+
         public async Task<bool> CheckUserExist(string email)
         {
             return await _context.Users.AnyAsync(x => x.Email.ToLower() == email.ToLower());
@@ -69,12 +76,22 @@ namespace Api.Services
             return t.Entity.Id;
         }
 
-        public async Task<List<UserModel>> GetUsers()
+        public async Task<IEnumerable<UserAvatarModel>> GetUsers()
         {
-            return await _context.Users.AsNoTracking().ProjectTo<UserModel>(_mapper.ConfigurationProvider).ToListAsync();
+            var users = await _context.Users.AsNoTracking()
+                .ProjectTo<UserModel>(_mapper.ConfigurationProvider)
+                .ToListAsync();
+            return users.Select(x => new UserAvatarModel(x, _linkGenerator));
         }
 
-        private async Task<DAL.Entities.User> GetUserById(Guid id)
+        public async Task<UserModel> GetUser(Guid id)
+        {
+            var user = await GetUserById(id);
+            return new UserAvatarModel(_mapper.Map<UserModel>(user), _linkGenerator);
+
+        }
+
+        private async Task<User> GetUserById(Guid id)
         {
             var user = await _context.Users.Include(x => x.Avatar).FirstOrDefaultAsync(x => x.Id == id);
 
@@ -82,99 +99,7 @@ namespace Api.Services
                 throw new Exception("User not found");
             return user;
         }
-
-        public async Task<UserModel> GetUser(Guid id)
-        {
-            var user = await GetUserById(id);
-            return _mapper.Map<UserModel>(user);
-        }
-
-        private async Task<DAL.Entities.User> GetUserByCredention(string login, string pass)
-        {
-            var user = await _context.Users.FirstOrDefaultAsync(x => x.Email.ToLower() == login.ToLower());
-            if (user == null)
-                throw new Exception("User not found");
-            if (!HashHelper.Verify(pass, user.PasswordHash))
-                throw new Exception("Incorrect password");
-            return user;
-        }
-
-        public async Task AddPost(Guid userId, PostModel model, string[] filePaths)
-        {
-            var user = await _context.Users.Include(x => x.Posts).FirstOrDefaultAsync(x => x.Id == userId);
-            if (user != null)
-            {
-                List<Attach> attaches = new List<Attach>();
-                int i = 0;
-                foreach (var item in model.PostAttaches)
-                {
-                    attaches.Add(new Attach { Author = user, FilePath = filePaths[i], MimeType = item.MimeType, Name = item.Name, Size = item.Size });
-                    i++;
-                }
-                var post = new Post { Author = user, Description = model.Description, PostAttaches = attaches, AttachPaths = filePaths, Created = model.Created };
-
-                user.Posts.Add(post);
-                await _context.SaveChangesAsync();
-            }
-        }
-
-        public async Task AddPost(Guid userId, PostModel model)
-        {
-            var user = await _context.Users.Include(x => x.Posts).FirstOrDefaultAsync(x => x.Id == userId);
-            if (user != null)
-            {
-                var post = new Post { Author = user, Description = model.Description };
-                user.Posts.Add(post);
-                await _context.SaveChangesAsync();
-            }
-        }
-        public async Task<List<GetPostModel>> GetPosts(Guid userId)
-        {
-            var user = await _context.Users.Include(x => x.Posts).FirstOrDefaultAsync(x => x.Id == userId);
-            List<GetPostModel> posts = new List<GetPostModel>();
-            if (user != null && user.Posts != null)
-            {
-                foreach (var post in user.Posts)
-                {
-                    posts.Add(_mapper.Map<GetPostModel>(post));
-                }
-            }
-            return posts;
-        }
-
-        public async Task<GetPostModel> GetPostById(Guid userId, Guid postId)
-        {
-            var user = await _context.Users.Include(x => x.Posts).FirstOrDefaultAsync(x => x.Id == userId);
-            var temp = await _context.Posts.FirstOrDefaultAsync((x => x.Id == postId));
-            var post = _mapper.Map<GetPostModel>(temp);
-            return post;
-        }
-
-        public async Task AddCommentToPost(Guid userId, CommentModel model)
-        {
-            var user = await _context.Users.Include(x => x.Posts).FirstOrDefaultAsync(x => x.Id == userId);
-            var post = await _context.Posts.Include(x => x.PostComments).FirstOrDefaultAsync(x => x.Id == model.PostId);
-            if (user != null && post != null)
-            {
-                var comment = new Comment { Author = user, CommentText = model.CommentText, Created = model.Created, PostId = model.PostId };
-                post.PostComments.Add(comment);
-                await _context.SaveChangesAsync();
-            }
-        }
-
-        public async Task<List<GetCommentsModel>> GetCommentsFromPost(Guid postId)
-        {
-            var post = await _context.Posts.Include(x => x.PostComments).Include(x => x.Author).FirstOrDefaultAsync(x => x.Id == postId);
-            List<GetCommentsModel> comments = new List<GetCommentsModel>();
-            if (post != null)
-            {
-                foreach (var comment in post.PostComments)
-                {
-                    comments.Add(_mapper.Map<GetCommentsModel>(comment));
-                }
-            }
-            return comments;
-        }
+       
 
         private TokenModel GenerateTokens(DAL.Entities.UserSession session)
         {
@@ -205,6 +130,17 @@ namespace Api.Services
                 );
             var encodedRefresh = new JwtSecurityTokenHandler().WriteToken(refresh);
             return new TokenModel(encodedJwt, encodedRefresh);
+        }
+        private async Task<User> GetUserByCredention(string login, string pass)
+        {
+            var user = await _context.Users.FirstOrDefaultAsync(x => x.Email.ToLower() == login.ToLower());
+            if (user == null)
+                throw new Exception("user not found");
+
+            if (!HashHelper.Verify(pass, user.PasswordHash))
+                throw new Exception("password is incorrect");
+
+            return user;
         }
         public async Task<TokenModel> GetToken(string login, string password)
         {
