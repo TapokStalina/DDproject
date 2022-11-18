@@ -44,8 +44,11 @@ namespace DAL
         public DbSet<Post> Posts => Set<Post>();
         public DbSet<PostContent> PostContents => Set<PostContent>();
         public DbSet<CommentContent> CommentContents => Set<CommentContent>();
-
         public DbSet<Comment> Comments => Set<Comment>();
+        public DbSet<LikeOnPost> LikesOnPost => Set<LikeOnPost>();
+        public DbSet<LikeOnComment> LikesOnComment => Set<LikeOnComment>();
+
+
 
     }
 }

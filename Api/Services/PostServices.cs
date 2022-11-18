@@ -10,7 +10,8 @@ using Api.Common.Const;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
-
+using Api.Models.Like;
+using Api.Migrations;
 
 namespace Api.Services
 {
@@ -87,6 +88,44 @@ namespace Api.Services
                 
             return comms;
         }
+
+        public async Task AddLikeToPost(Guid authorId, Guid postId)
+        {
+            var like = new LikeOnPost { AuthorId = authorId, PostId = postId };
+            await _context.LikesOnPost.AddAsync(like);
+            await _context.SaveChangesAsync();
+        }
+        public async Task AddLikeToComment(Guid authorId, Guid commentId)
+        {
+            var like = new LikeOnComment { AuthorId = authorId, CommentId = commentId };
+            await _context.LikesOnComment.AddAsync(like);
+            await _context.SaveChangesAsync();
+        }
+        public async Task<List<LikeModel>> GetLikesOnPost(Guid postId)
+        {
+            var likes = await _context.LikesOnPost.Where(x => x.PostId == postId).AsNoTracking().ToListAsync();
+            var like = likes.Select(lk =>
+                new LikeModel
+                {
+                    AuthorId = lk.AuthorId,
+                    EntityId = lk.PostId,
+                   
+                }).ToList();
+            return like;
+        }
+        public async Task<List<LikeModel>> GetLikesOnComment(Guid commentId)
+        {
+            var comments = await _context.LikesOnComment.Where(x => x.CommentId == commentId).AsNoTracking().ToListAsync();
+            var comm = comments.Select(cm =>
+                new LikeModel
+                {
+                    AuthorId = cm.AuthorId,
+                    EntityId = cm.CommentId,
+
+                }).ToList();
+            return comm;
+        }
+
     }
 }
 

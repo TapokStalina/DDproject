@@ -1,5 +1,6 @@
 ﻿using Api.Common.Const;
 using Api.Models.Attach;
+using Api.Models.Like;
 using Api.Models.Post;
 using Api.Services;
 using AutoMapper;
@@ -111,6 +112,37 @@ namespace Api.Controllers
         [HttpGet]
         public async Task<List<CommentModel>> GetComments(Guid postId)
              => await _postService.GetComments(postId);
+
+        [HttpPost]
+        [Authorize]
+        public async Task AddLikeToPost(Guid postId)
+        {
+            var userId = User.GetClaimValue<Guid>(ClaimNames.Id);
+            if (userId == default)
+                throw new Exception("You are not authorized");
+            await _postService.AddLikeToPost(userId, postId);
+        }
+        [HttpPost]
+        [Authorize]
+        public async Task AddLikeToComment(Guid commentId)
+        {
+            var userId = User.GetClaimValue<Guid>(ClaimNames.Id);
+            if (userId == default)
+                throw new Exception("You are not authorized");
+            await _postService.AddLikeToComment(userId, commentId);
+        }
+
+        [HttpGet]
+        public async Task<List<LikeModel>> GetLikesOnPost(Guid postId)
+        {
+            return await _postService.GetLikesOnPost(postId);
+        }
+        [HttpGet]
+        public async Task<List<LikeModel>> GetLikesOnComment(Guid commentId)
+        {
+            return await _postService.GetLikesOnComment(commentId);
+        }
+
 
     }
 }
