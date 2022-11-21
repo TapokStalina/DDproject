@@ -18,14 +18,16 @@ namespace Api
                 .ForMember(d => d.BirthDate, m => m.MapFrom(s => s.BirthDate.UtcDateTime))
                 ;
             CreateMap<User, UserModel>();
+            CreateMap<User, UserAvatarModel>();
 
             CreateMap<Avatar, AttachModel>();
             CreateMap<PostContent, AttachModel >();
+            CreateMap<PostContent, AttachExternalModel>();
 
 
-            CreateMap<MetadataModel, PostContent>();
-
-            CreateMap<MetaWithPath, PostContent>();
+            CreateMap<CreatePostRequest, CreatePostModel>();
+            CreateMap<MetadataModel, MetadataLinkModel>();
+            CreateMap<MetadataLinkModel, PostContent>();
 
             CreateMap<CreatePostModel, Post>()
                 .ForMember(d => d.PostContents, m => m.MapFrom(s => s.Contents))

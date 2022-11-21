@@ -28,8 +28,8 @@ namespace Api.Services
             _config = config.Value;
         }
 
-        private Func<UserModel, string?>? _linkGenerator;
-        public void SetLinkGenerator(Func<UserModel, string?> linkGenerator)
+        private Func<User, string?>? _linkGenerator;
+        public void SetLinkGenerator(Func<User, string?> linkGenerator)
         {
             _linkGenerator = linkGenerator;
         }
@@ -76,22 +76,19 @@ namespace Api.Services
             return t.Entity.Id;
         }
 
-        public async Task<IEnumerable<UserAvatarModel>> GetUsers()
+        public async Task<IEnumerable<UserAvatarModel>> GetUsers() =>
+             (await _context.Users.AsNoTracking().Include(x => x.Avatar).ToListAsync())
+                 .Select(x => _mapper.Map<User, UserAvatarModel>(x, o => o.AfterMap(FixAvatar)));
+
+        public async Task<UserAvatarModel> GetUser(Guid id) =>
+            _mapper.Map<User, UserAvatarModel>(await GetUserById(id), o => o.AfterMap(FixAvatar));
+
+        private void FixAvatar(User s, UserAvatarModel d)
         {
-            var users = await _context.Users.AsNoTracking()
-                .ProjectTo<UserModel>(_mapper.ConfigurationProvider)
-                .ToListAsync();
-            return users.Select(x => new UserAvatarModel(x, _linkGenerator));
+            d.AvatarLink = s.Avatar == null ? null : _linkGenerator?.Invoke(s);
         }
 
-        public async Task<UserModel> GetUser(Guid id)
-        {
-            var user = await GetUserById(id);
-            return new UserAvatarModel(_mapper.Map<UserModel>(user), _linkGenerator);
-
-        }
-
-        private async Task<User> GetUserById(Guid id)
+            private async Task<User> GetUserById(Guid id)
         {
             var user = await _context.Users.Include(x => x.Avatar).FirstOrDefaultAsync(x => x.Id == id);
 

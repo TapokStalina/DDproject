@@ -1,4 +1,7 @@
-﻿using Api.Models.Attach;
+﻿using Api.Common.Const;
+using Api.Models.Attach;
+using Api.Services;
+using Common.Extentions;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 
@@ -8,6 +11,15 @@ namespace Api.Controllers
     [ApiController]
     public class AttachController : ControllerBase
     {
+        private readonly PostServices _postService;
+        private readonly UserServices _userService;
+
+        public AttachController(PostServices postService, UserServices userService)
+        {
+            _postService = postService;
+            _userService = userService;
+        }
+
         [HttpPost]
         public async Task<List<MetadataModel>> UploadFiles([FromForm] List<IFormFile> files)
         {
@@ -18,6 +30,22 @@ namespace Api.Controllers
             }
             return res;
         }
+        [HttpGet]
+        [Route("{postContentId}")]
+        public async Task<FileStreamResult> GetPostContent(Guid postContentId, bool download = false)
+            => RenderAttach(await _postService.GetPostContent(postContentId), download);
+
+
+        [HttpGet]
+        [Route("{userId}")]
+        public async Task<FileStreamResult> GetUserAvatar(Guid userId, bool download = false)
+            => RenderAttach(await _userService.GetUserAvatar(userId), download);
+
+
+        [HttpGet]
+        public async Task<FileStreamResult> GetCurentUserAvatar(bool download = false)
+            => await GetUserAvatar(User.GetClaimValue<Guid>(ClaimNames.Id), download);
+
         [HttpPost]
         private async Task<MetadataModel> UploadFile(IFormFile file)
         {
@@ -48,6 +76,17 @@ namespace Api.Controllers
                 }
                 return meta;
             
+        }
+
+        private FileStreamResult RenderAttach(AttachModel attach, bool download)
+        {
+            var fs = new FileStream(attach.FilePath, FileMode.Open);
+            var ext = Path.GetExtension(attach.Name);
+            if (download)
+                return File(fs, attach.MimeType, $"{attach.Id}{ext}");
+            else
+                return File(fs, attach.MimeType);
+
         }
     }
 }

@@ -8,7 +8,7 @@
         public string FilePath { get; set; } = null!;
 
     }
-    public class AttachWithLinkModel
+    public class AttachExternalModel
     {
         public Guid Id { get; set; }
 
@@ -16,12 +16,12 @@
         public string MimeType { get; set; } = null!;
         public string? ContentLink { get; set; } = null!;
 
-        public AttachWithLinkModel(AttachModel model, Func<AttachModel, string?>? linkGenerator)
-        {
-            Id = model.Id;
-            Name = model.Name;
-            MimeType = model.MimeType;
-            ContentLink = linkGenerator?.Invoke(model);
-        }
+        //public AttachExternalModel(AttachModel model, Func<AttachModel, string?>? linkGenerator)
+        //{
+        //    Id = model.Id;
+        //    Name = model.Name;
+        //    MimeType = model.MimeType;
+        //    ContentLink = linkGenerator?.Invoke(model);
+        //}
     }
 }
