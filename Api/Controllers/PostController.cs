@@ -15,44 +15,38 @@ namespace Api.Controllers
 {
     [Route("api/[controller]/[action]")]
     [ApiController]
+    [ApiExplorerSettings(GroupName = "Api")]
     public class PostController : ControllerBase
     {
         private readonly PostServices _postService;
-        public PostController(PostServices postService)
+        public PostController(PostServices postService, LinkGeneratorService links)
         {
             _postService = postService;
-            _postService.SetLinkGenerator(_linkContentGenerator, _linkAvatarGenerator);
-        }
-
-        private string? _linkAvatarGenerator(Guid userId)
-        {
-            return Url.ControllerAction<AttachController>(nameof(AttachController.GetUserAvatar), new
+            links.LinkContentGenerator = x => Url.ControllerAction<AttachController>(nameof(AttachController.GetPostContent), new
             {
-                userId,
+                postContentId = x.Id,
             });
-        }
-        private string? _linkContentGenerator(Guid postContentId)
-        {
-            return Url.ControllerAction<AttachController>(nameof(AttachController.GetPostContent), new
+            links.LinkAvatarGenerator = x => Url.ControllerAction<AttachController>(nameof(AttachController.GetUserAvatar), new
             {
-                postContentId,
+                userId = x.Id,
             });
         }
 
         [HttpGet]
         public async Task<List<PostModel>> GetPosts(int skip = 0, int take = 10)
             => await _postService.GetPosts(skip, take);
+        [HttpGet]
+        public async Task<List<PostModel>> GetPostsBySubscribes( Guid subscribesOwnerId, int skip = 0, int take = 10)
+            => await _postService.GetPostsBySubscribes(subscribesOwnerId, skip, take );
 
         [HttpPost]
         public async Task CreatePost(CreatePostRequest request)
         {
-            if (!request.AuthorId.HasValue)
-            {
                 var userId = User.GetClaimValue<Guid>(ClaimNames.Id);
                 if (userId == default)
-                    throw new Exception("not authorize");
+                    throw new Exception("You are not authorized");
                 request.AuthorId = userId;
-            }
+         
             await _postService.CreatePost(request);
         }
 
@@ -62,7 +56,7 @@ namespace Api.Controllers
             
             var userId = User.GetClaimValue<Guid>(ClaimNames.Id);
             if (userId == default)
-                throw new Exception("Not authorize");
+                throw new Exception("You are not authorized");
 
             var model = new CreateCommentModel
             {
@@ -108,8 +102,6 @@ namespace Api.Controllers
         {
             return await _postService.GetLikesOnComment(commentId);
         }
-
-
     }
 }
 

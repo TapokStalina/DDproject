@@ -19,13 +19,7 @@ namespace Api.Services
     {
         private readonly IMapper _mapper;
         private readonly DAL.DataContext _context;
-        private Func<Guid, string?>? _linkContentGenerator;
-        private Func<Guid, string?>? _linkAvatarGenerator;
-        public void SetLinkGenerator(Func<Guid, string?> linkContentGenerator, Func<Guid, string?> linkAvatarGenerator)
-        {
-            _linkAvatarGenerator = linkAvatarGenerator;
-            _linkContentGenerator = linkContentGenerator;
-        }
+
         public PostServices(IMapper mapper, IOptions<AuthConfig> config, DataContext context)
         {
             _mapper = mapper;
@@ -54,11 +48,12 @@ namespace Api.Services
                     File.Move(tempFi.FullName, x.FilePath, true);
                 }
             });
-            var dbModel = _mapper.Map<Post>(model);
 
+            var dbModel = _mapper.Map<Post>(model);
             await _context.Posts.AddAsync(dbModel);
             await _context.SaveChangesAsync();
         }
+
         public async Task CreateComment(CreateCommentModel model)
         {
             var dbModel = _mapper.Map<Comment>(model);
@@ -72,28 +67,29 @@ namespace Api.Services
             var posts = await _context.Posts
                 .Include(x => x.Author).ThenInclude(x => x.Avatar)
                 .Include(x => x.PostContents).AsNoTracking().OrderByDescending(x => x.Created)
+                .Select(x => _mapper.Map<PostModel>(x))
                 .Skip(skip).Take(take).ToListAsync();
-
-            var res = posts.Select(post =>
-                new PostModel
-                {
-                    Author = _mapper.Map<User, UserAvatarModel>(post.Author, o => o.AfterMap(FixAvatar)),
-                    Description = post.Description,
-                    Id = post.Id,
-                    Contents = post.PostContents?.Select(x =>
-                    _mapper.Map<PostContent, AttachExternalModel>(x, o => o.AfterMap(FixContent)))
-                    .ToList()
-                }).ToList();
-            return res;
+            return posts;
         }
-
-        private void FixAvatar(User s, UserAvatarModel d)
+        public async Task<List<PostModel>> GetPostsBySubscribes(Guid subscribesOwnerId, int skip, int take )
         {
-            d.AvatarLink = s.Avatar == null ? null : _linkAvatarGenerator?.Invoke(s.Id);
-        }
-        private void FixContent(PostContent s, AttachExternalModel d)
-        {
-            d.ContentLink = _linkContentGenerator?.Invoke(s.Id);
+            var subs = await _context.Subscribes
+                .Where(x => x.SubscribeOwnerId == subscribesOwnerId)
+                .AsNoTracking().ToListAsync();
+            List<Guid> subscibers = new List<Guid>();
+            foreach (var sub in subs)
+                subscibers.Add(sub.SubscriberId);
+            List<PostModel> posts = new List<PostModel>();  
+            foreach (var sub in subscibers)
+            { 
+                var post = await _context.Posts
+                    .Include(x => x.Author).Where(x => x.Id == sub)
+                    .Include(x => x.PostContents).AsNoTracking().OrderByDescending(x => x.Created)
+                    .Select(x => _mapper.Map<PostModel>(x))
+                    .Skip(skip).Take(take).ToListAsync();
+                posts.AddRange(post);
+            }
+            return posts;
         }
 
         public async Task<AttachModel> GetPostContent(Guid postContentId)

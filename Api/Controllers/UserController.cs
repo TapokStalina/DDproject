@@ -1,6 +1,7 @@
 ﻿using Api.Common.Const;
 using Api.Models.Attach;
 using Api.Models.Post;
+using Api.Models.Subscribe;
 using Api.Models.UserModel;
 using Api.Services;
 using Common.Extentions;
@@ -11,28 +12,19 @@ namespace Api.Controllers
 {
     [Route("api/[controller]/[action]")]
     [ApiController]
+    [ApiExplorerSettings(GroupName = "Api")]
     public class UserController : ControllerBase
     {
         private readonly UserServices _userServices;  
 
-        public UserController(UserServices userServices)
+        public UserController(UserServices userServices, LinkGeneratorService links)
         {
             _userServices = userServices;
-
-            _userServices.SetLinkGenerator(x =>
+            links.LinkAvatarGenerator = x =>
             Url.ControllerAction<AttachController>(nameof(AttachController.GetUserAvatar), new
             {
                 userId = x.Id,
-            }));
-        }
-
-        [HttpPost]
-        public async Task CreateUser(CreateUserModel model)
-        {
-            if (await _userServices.CheckUserExist(model.Email))
-                throw new Exception("User is exist");
-            await _userServices.CreateUser(model);
-
+            });
         }
 
         [HttpPost]
@@ -78,6 +70,24 @@ namespace Api.Controllers
             else
                 throw new Exception("You are not authorized");
         }
-       
+
+        [HttpPost]
+        [Authorize]
+        public async Task AddSubscribe(Guid subscriberId)
+        {
+            var userId = User.GetClaimValue<Guid>(ClaimNames.Id);
+            if (userId == default)
+                throw new Exception("You are not authorized");
+            await _userServices.AddSubscribe(subscriberId, userId);
+        }
+        [HttpPost]
+        [Authorize]
+        public async Task<List<SubscribeModel>> GetAllSubscribes(Guid subscribesOwnerId)
+        {
+            var userId = User.GetClaimValue<Guid>(ClaimNames.Id);
+            if (userId == default)
+                throw new Exception("You are not authorized");
+           return await _userServices.GetAllSubscribers(subscribesOwnerId);
+        }
     }
 }

@@ -12,6 +12,7 @@
     {
         public string FilePath { get; set; } = null!;
         public Guid AuthorId { get; set; }
+
         //public MetadataLinkModel(MetadataModel model, Func<MetadataModel, string> pathgen, Guid authorId)
         //{
         //    TempId = model.TempId;

@@ -30,7 +30,7 @@ namespace DAL
             modelBuilder.Entity<Comment>().ToTable(nameof(Comments));
             modelBuilder.Entity<CommentContent>().ToTable(nameof(CommentContent));
 
-
+            modelBuilder.Entity<Subscribe>().ToTable(nameof(Subscribe));
 
 
         }
@@ -47,6 +47,8 @@ namespace DAL
         public DbSet<Comment> Comments => Set<Comment>();
         public DbSet<LikeOnPost> LikesOnPost => Set<LikeOnPost>();
         public DbSet<LikeOnComment> LikesOnComment => Set<LikeOnComment>();
+        public DbSet<Subscribe> Subscribes => Set<Subscribe>();
+
 
 
 

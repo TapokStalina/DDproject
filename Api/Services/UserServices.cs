@@ -1,6 +1,9 @@
 ﻿using Api.Configs;
+using Api.Migrations;
 using Api.Models.Attach;
+using Api.Models.Like;
 using Api.Models.Post;
+using Api.Models.Subscribe;
 using Api.Models.Token;
 using Api.Models.UserModel;
 using AutoMapper;
@@ -27,13 +30,7 @@ namespace Api.Services
             _context = context;
             _config = config.Value;
         }
-
-        private Func<User, string?>? _linkGenerator;
-        public void SetLinkGenerator(Func<User, string?> linkGenerator)
-        {
-            _linkGenerator = linkGenerator;
-        }
-
+        
         public async Task<bool> CheckUserExist(string email)
         {
             return await _context.Users.AnyAsync(x => x.Email.ToLower() == email.ToLower());
@@ -77,28 +74,48 @@ namespace Api.Services
         }
 
         public async Task<IEnumerable<UserAvatarModel>> GetUsers() =>
-             (await _context.Users.AsNoTracking().Include(x => x.Avatar).ToListAsync())
-                 .Select(x => _mapper.Map<User, UserAvatarModel>(x, o => o.AfterMap(FixAvatar)));
+             await _context.Users.AsNoTracking()
+            .Include(x => x.Avatar)
+            .Include(x => x.Posts)
+            .Select(x => _mapper.Map<UserAvatarModel>(x))
+            .ToListAsync();
 
         public async Task<UserAvatarModel> GetUser(Guid id) =>
-            _mapper.Map<User, UserAvatarModel>(await GetUserById(id), o => o.AfterMap(FixAvatar));
+            _mapper.Map<User, UserAvatarModel>(await GetUserById(id));
 
-        private void FixAvatar(User s, UserAvatarModel d)
+        private async Task<User> GetUserById(Guid id)
         {
-            d.AvatarLink = s.Avatar == null ? null : _linkGenerator?.Invoke(s);
-        }
-
-            private async Task<User> GetUserById(Guid id)
-        {
-            var user = await _context.Users.Include(x => x.Avatar).FirstOrDefaultAsync(x => x.Id == id);
+            var user = await _context.Users
+                .Include(x => x.Avatar)
+                .Include(x => x.Posts).FirstOrDefaultAsync(x => x.Id == id);
 
             if (user == null)
                 throw new Exception("User not found");
             return user;
         }
-       
 
-        private TokenModel GenerateTokens(DAL.Entities.UserSession session)
+        public async Task AddSubscribe(Guid subscriberId, Guid subscribeOwnerId)
+        {
+            var sub = new Subscribe { SubscribeOwnerId = subscribeOwnerId, SubscriberId = subscriberId, Created = DateTime.UtcNow};
+            await _context.Subscribes.AddAsync(sub);
+            await _context.SaveChangesAsync();
+        }
+
+        public async Task<List<SubscribeModel>> GetAllSubscribers(Guid subscribesOwnerId)
+        {
+            var subscribers = await _context.Subscribes
+                .Where(x => x.SubscribeOwnerId == subscribesOwnerId).AsNoTracking().ToListAsync();
+            var subscribe = subscribers.Select(subs =>
+                new SubscribeModel
+                {
+                    SubscribeOwnerId = subs.SubscribeOwnerId,
+                    SubscriberId = subs.SubscriberId,
+
+                }).ToList();
+            return subscribe;
+        }
+
+        private TokenModel GenerateTokens(UserSession session)
         {
             var dtNow = DateTime.Now;
             if (session.User == null)
